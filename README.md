@@ -125,6 +125,12 @@ This corresponds to the received value:
 
 OUTPUT:
 
+![OUTPUT](doc/img4.png)
+
+This design demonstrates a basic SPI Master operating in an 8-bit, full-duplex mode. It generates SCLK, controls chip select, transmits data on MOSI, receives data on MISO, and provides busy and done signals to indicate the transfer status.
+
+## SPI SLAVE :
+
 
 
 
