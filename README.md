@@ -50,6 +50,46 @@ There are two ways to connect multiple slaves to the master. If the master has m
 
 ## DATA TRANSMISSION :
 
+To begin communication, the SPI master first selects the device it wants to communicate with by pulling its SS low. 
+If a waiting period is required, such as for an analog-to-digital conversion, the master must wait for at least that period of time before issuing clock cycles.
+
+
+![DATA TRANSMISSION](doc/img3.png
+
+During each SPI clock cycle, full-duplex transmission of a single bit occurs. The master sends a bit on the MOSI line while the slave sends a bit on the MISO line, and then each reads their corresponding incoming bit. This sequence is maintained even when only one-directional data transfer is intended.
+
+Transmission using a single slave involves one shift register in the master and one shift register in the slave, both of some given word size (e.g. 8 bits). The transmissions often consist of eight-bit words, but other word-sizes are also common.
+
+Data is usually shifted out with the most-significant bit (MSB) first but the original specification has a LSBFE ("LSB-First Enable") to control whether data is transferred least (LSB) or most significant bit (MSB) first. On the clock edge, both master and slave shift out a bit to its counterpart.
+
+On the next clock edge, each receiver samples the transmitted bit and stores it in the shift register as the new least-significant bit. After all bits have been shifted out and in, the master and slave have exchanged register values. If more data needs to be exchanged, the shift registers are reloaded and the process repeats. 
+Transmission may continue for any number of clock cycles. When complete, the master stops toggling the clock signal, and typically deselects the slave.
+
+- **CLOCK POLARTITY PHASE:**
+
+  The master must also configure the clock polarity and phase with respect to the data , it named these two options as CPOL and CPHA (for clock polarity and clock phase) respectively.
+  CPOL represents the polarity of the clock. Polarities can be converted with a simple inverter.
+  
+- SCLKCPOL=0 is a clock which idles at the logical low voltage.
+  
+- SCLKCPOL=1 is a clock which idles at the logical high voltage.
+  
+CPHA represents the phase of each data bit's transmission cycle relative to SCLK.
+
+- **For CPHA=0:**
+  
+The first data bit is output immediately when SS activates.
+Subsequent bits are output when SCLK transitions to its idle voltage level.
+Sampling occurs when SCLK transitions from its idle voltage level.
+
+- **For CPHA=1:**
+  
+The first data bit is output on SCLK's first clock edge after SS activates.
+Subsequent bits are output when SCLK transitions from its idle voltage level.
+Sampling occurs when SCLK transitions to its idle voltage level.
+Conversion between these two phases is non-trivial.
+
+
 
 
 
