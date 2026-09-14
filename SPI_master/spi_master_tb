@@ -1,8 +1,9 @@
-`timescale 1ns/1ns
 
+`timescale 1ns/1ns
 module spi_master_tb;
 
-    wire        sclk, cs, mosi, done, busy;
+    wire        sclk, cs, 
+     wire       mosi, done, busy;
     wire [7:0]  miso_data;
     reg  [7:0] mosi_data ;
     reg         clk, rst, start, miso;
@@ -65,6 +66,5 @@ end
         $finish;
     end
 endmodule
-
 
 
