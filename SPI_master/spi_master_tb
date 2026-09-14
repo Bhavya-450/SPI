@@ -1,58 +1,70 @@
 `timescale 1ns/1ns
 
 module spi_master_tb;
-    
-    reg clk;
-    reg rst;
-    // Chip Select
-    reg en;
-    wire cs;
-    // Serial Clock
-    wire sck;
-    // Master Out Slave In
-    reg [7:0] ext_command_in;
-    reg [23:0] ext_address_in;
-    reg [31:0] ext_data_in;
-    wire mosi;
-    // Master In Slave Out
-    reg miso;
-    wire [31:0] ext_data_out;
+
+    wire        sclk, cs, mosi, done, busy;
+    wire [7:0]  miso_data;
+    reg  [7:0] mosi_data ;
+    reg         clk, rst, start, miso;
 
     spi_master uut (
-        .clk (clk),
-        .rst (rst),
-        .en (en),
-        .cs (cs),
-        .sck (sck),
-        .ext_command_in (ext_command_in),
-        .ext_address_in (ext_address_in),
-        .ext_data_in (ext_data_in),
-        .mosi (mosi),
-        .miso (miso),
-        .ext_data_out (ext_data_out)
+        .mosi_data  (mosi_data),
+        .sclk     (sclk),
+        .cs       (cs),
+        .mosi     (mosi),
+        .done     (done),
+        .busy     (busy),
+        .miso_data (miso_data),
+        .clk      (clk),
+        .rst      (rst),
+        .start    (start),
+        .miso     (miso)
     );
 
+    // Clock generation
     initial clk = 0;
-    always #10 clk = ~clk;
-    
-    initial begin
-        #10 rst = 1;
-        #50 rst = 0;
-        #50 ext_command_in = 8'ha5; ext_address_in = 24'h12_34_56; ext_data_in = 32'h78_9a_bc_de;
-        #25 en = 1;
-        #30 en = 0;
-        #1500 ext_command_in = 8'h00; ext_address_in = 24'hf0_12_34; ext_data_in = 32'h56_78_9a_bc;
-        #25 en = 1;
-        #25 en = 0;
-        #1500 ext_command_in = 8'hff; ext_address_in = 24'hde_f0_12; ext_data_in = 32'h34_56_78_9a;
-        #30 en = 1;
-        #30 en = 0;
-        #1500 $finish;
-    end
-    
-    initial begin
-        $dumpfile("./temp/SPI_Master_tb.vcd");
-        $dumpvars(0,spi_master_tb);
-    end
+    always #5 clk = ~clk;
+  
+initial begin 
+  $dumpfile("spi_master.vcd");
+  $dumpvars(0,spi_master_tb);
+end   
+      
 
+    initial begin
+   $monitor("Time=%0t cs= %b sclk=%b mosi=%b done=%b busy=%b  clk=%b rst=%b start=%b miso=%b miso_data = %b mosi_data =%b ",
+                  $time, cs, sclk, mosi, done, busy,clk, rst, start, miso, miso_data, mosi_data);
+
+        rst     = 1;
+        start   = 0;
+        miso    = 0;
+        mosi_data = 8'b10101100;
+        #20;
+        
+        rst = 0;
+       
+        @(posedge clk);  #1;
+        start = 1;
+        @(posedge clk);   #1;
+        start = 0;
+
+        // Drive miso to feed back in a known RX pattern (sample on sclk falling->rising window)
+
+@(posedge sclk); miso = 0;
+@(posedge sclk); miso = 1;
+@(posedge sclk); miso = 0;
+@(posedge sclk); miso = 1;
+@(posedge sclk); miso = 1;
+@(posedge sclk); miso = 0;
+@(posedge sclk); miso = 0;
+@(posedge sclk); miso = 1;
+
+        wait (done == 1);
+        #10;
+
+        $finish;
+    end
 endmodule
+
+
+
