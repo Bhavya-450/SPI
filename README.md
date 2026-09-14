@@ -179,6 +179,7 @@ OUTPUT- SPI SLAVE:
 ## CONCLUSION:
 
 This project successfully demonstrates full-duplex SPI communication by integrating an SPI Master and SPI Slave in a single SPI_TOP design. The master generates the serial clock (SCLK) and chip-select (CS) signal, sends data through MOSI, and receives data through MISO.
+
 The slave responds only when selected by CS, receives the master data, and simultaneously sends its own data back to the master.
 
 The design transfers 8-bit data in MSB-first order using SPI Mode 0 timing. The master samples MISO on the rising edge of SCLK, while the slave samples MOSI on the same edge. The next output bit is prepared on the falling edge, ensuring stable communication.
