@@ -1,39 +1,80 @@
-`timescale 1ns/1ns
 
+`timescale 1ns/1ns
 module spi_slave_tb;
-    
+
     reg clk;
     reg rst;
-    // Chip Select
     reg cs;
-    // Serial Clock
-    reg sck;
-    // Master Out Slave In
+    reg sclk;
     reg mosi;
-    // Master In Slave Out
-    wire miso;
+    reg [7:0] tx_data;
 
-    spi_slave uut (
-        .clk (clk),
-        .rst (rst),
-        .cs (cs),
-        .sck (sck),
-        .mosi (mosi),
-        .miso (miso)
+    wire miso;
+    wire [7:0] rx_data;
+    wire done;
+
+    spi_slave_v2 uut (
+        .clk     (clk),
+        .rst     (rst),
+        .cs      (cs),
+        .sclk    (sclk),
+        .mosi    (mosi),
+        .miso    (miso),
+        .tx_data (tx_data),
+        .rx_data (rx_data),
+        .done    (done)
     );
 
-    initial clk = 0;
+    // System clock: 20 ns period
+    initial clk = 1'b0;
     always #10 clk = ~clk;
-    
-    initial begin
-        #10 rst = 1;
-        #50 rst = 0;
-        #1500 $finish;
-    end
 
     initial begin
-        $dumpfile("./temp/SPI_Slave_tb.vcd");
-        $dumpvars(0,spi_slave_tb);
-    end
+        $dumpfile("SPI_Slave_tb.vcd");
+        $dumpvars(0, spi_slave_tb);
 
+        $monitor("T=%0t | cs=%b sclk=%b mosi=%b miso=%b | rx_data=%b done=%b",
+                 $time, cs, sclk, mosi, miso, rx_data, done);
+
+        // Initial values
+        rst     = 1'b1;
+        cs      = 1'b1;
+        sclk    = 1'b0;
+        mosi    = 1'b0;
+        tx_data = 8'b11001010;  // Slave sends this byte to master
+
+        // Reset
+        #45;
+        rst = 1'b0;
+
+        // Start SPI transfer
+        #30;
+        cs = 1'b0;
+
+        // Master sends: 01011001
+        // Slave samples MOSI on rising edges of SCLK.
+        mosi = 1'b0; #30; sclk = 1'b1; #30; sclk = 1'b0;
+        mosi = 1'b1; #30; sclk = 1'b1; #30; sclk = 1'b0;
+        mosi = 1'b0; #30; sclk = 1'b1; #30; sclk = 1'b0;
+        mosi = 1'b1; #30; sclk = 1'b1; #30; sclk = 1'b0;
+        mosi = 1'b1; #30; sclk = 1'b1; #30; sclk = 1'b0;
+        mosi = 1'b0; #30; sclk = 1'b1; #30; sclk = 1'b0;
+        mosi = 1'b0; #30; sclk = 1'b1; #30; sclk = 1'b0;
+        mosi = 1'b1; #30; sclk = 1'b1; #30; sclk = 1'b0;
+
+        // End SPI transfer
+        #30;
+        cs = 1'b1;
+
+        // Wait for slave done pulse
+        @(posedge done);
+
+        if (rx_data == 8'b01011001)
+            $display("TEST PASSED: Received data = %b", rx_data);
+        else
+            $display("TEST FAILED: Received data = %b", rx_data);
+
+        #50;
+        $finish;
+    end
 endmodule
