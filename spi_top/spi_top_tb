@@ -1,70 +1,93 @@
-module spi_tb;
-    
+`timescale 1ns/1ns
+
+module SPI_TOP_TB;
+
     reg clk;
     reg rst;
-    reg [2:0] address;
-    reg we;
-    reg [31:0] write_data;
-    reg re;
-    wire [31:0] read_data;
+    reg start;
 
-    spi uut (
-        .clk (clk),
-        .rst (rst),
-        .addr (address),
-        .we (we),
-        .write_data (write_data),
-        .re (re),
-        .read_data (read_data)
+    reg [7:0] master_tx_data;
+    reg [7:0] slave_tx_data;
+
+    wire [7:0] master_rx_data;
+    wire [7:0] slave_rx_data;
+
+    wire sclk;
+    wire cs;
+    wire mosi;
+    wire miso;
+    wire master_busy;
+    wire master_done;
+    wire slave_done;
+
+    SPI_TOP uut (
+        .clk            (clk),
+        .rst            (rst),
+        .start          (start),
+        .master_tx_data (master_tx_data),
+        .slave_tx_data  (slave_tx_data),
+        .master_rx_data (master_rx_data),
+        .slave_rx_data  (slave_rx_data),
+        .sclk           (sclk),
+        .cs             (cs),
+        .mosi           (mosi),
+        .miso           (miso),
+        .master_busy    (master_busy),
+        .master_done    (master_done),
+        .slave_done     (slave_done)
     );
 
-    initial clk = 0;
-    always #10 clk = ~clk;
-    
-    initial begin
-        #10 rst = 1;
-        #50 rst = 0;
-        #50 address = 0; we = 0; write_data = 1;
-        #20 address = 1; we = 1; write_data = 8'ha5;
-        #20 address = 2; we = 1; write_data = 24'h12_34_56;
-        #20 address = 3; we = 1; write_data = 32'h78_9a_bc_de;
-        #30 address = 0; we = 1; write_data = 1;
-        #30 address = 0; we = 1; write_data = 0;
-        #3000 address = 1; we = 1; write_data = 8'h00;
-        #20 address = 2; we = 1; write_data = 24'hf0_12_34;
-        #20 address = 3; we = 1; write_data = 32'h56_78_9a_bc;
-        #30 address = 0; we = 1; write_data = 1;
-        #30 address = 0; we = 1; write_data = 0;
-        #3000 address = 1; we = 1; write_data = 8'hff;
-        #20 address = 2; we = 1; write_data = 24'hde_f0_12;
-        #20 address = 3; we = 1; write_data = 32'h34_56_78_9a;
-        #30 address = 0; we = 1; write_data = 1;
-        #30 address = 0; we = 1; write_data = 0;
-        #3000 address = 4; re = 0;
-        #3000 address = 4; re = 1;
-        #20 address = 1; we = 1; write_data = 8'h00;
-        #20 address = 2; we = 1; write_data = 24'h12_34_56;
-        #20 address = 3; we = 1; write_data = 32'h78_9a_bc_de;
-        #30 address = 0; we = 1; write_data = 1;
-        #30 address = 0; we = 1; write_data = 0;
-        #3000 address = 1; we = 1; write_data = 8'hff;
-        #20 address = 2; we = 1; write_data = 24'hf0_12_34;
-        #20 address = 3; we = 1; write_data = 32'h56_78_9a_bc;
-        #30 address = 0; we = 1; write_data = 1;
-        #30 address = 0; we = 1; write_data = 0;
-        #3000 address = 4; re = 0;
-        #3000 address = 4; re = 1;
-        #3000 address = 1; we = 1; write_data = 8'h5a;
-        #20 address = 2; we = 1; write_data = 24'hde_f0_12;
-        #20 address = 3; we = 1; write_data = 32'h34_56_78_9a;
-        #30 address = 0; we = 1; write_data = 1;
-        #30 address = 0; we = 1; write_data = 0;
-        #3000 $finish;
-    end
+    // 10 ns system-clock period
+    initial clk = 1'b0;
+    always #5 clk = ~clk;
 
     initial begin
-        $dumpfile("./temp/SPI_tb.vcd");
-        $dumpvars(0,spi_tb);
+        $dumpfile("SPI_TOP_TB.vcd");
+        $dumpvars(0, SPI_TOP_TB);
+
+        $monitor("T=%0t | CS=%b SCLK=%b MOSI=%b MISO=%b | M_TX=%b M_RX=%b | S_TX=%b S_RX=%b | Busy=%b M_Done=%b S_Done=%b",
+                 $time, cs, sclk, mosi, miso,
+                 master_tx_data, master_rx_data,
+                 slave_tx_data, slave_rx_data,
+                 master_busy, master_done, slave_done);
+
+        // Initial/reset values
+        rst            = 1'b1;
+        start          = 1'b0;
+        master_tx_data = 8'b10101100;
+        slave_tx_data  = 8'b01011001;
+
+        #20;
+        rst = 1'b0;
+
+        // Start one SPI transaction
+        @(posedge clk);
+        #1 start = 1'b1;
+
+        @(posedge clk);
+        #1 start = 1'b0;
+
+        // Wait until master completes the transfer
+        @(posedge master_done);
+
+        // Allows slave to detect CS rising edge and assert slave_done
+        #20;
+
+        // Master must receive the slave's data
+        if (master_rx_data == 8'b01011001)
+            $display("MASTER TEST PASSED: master_rx_data = %b", master_rx_data);
+        else
+            $display("MASTER TEST FAILED: master_rx_data = %b", master_rx_data);
+
+        // Slave must receive the master's data
+        if (slave_rx_data == 8'b10101100)
+            $display("SLAVE TEST PASSED: slave_rx_data = %b", slave_rx_data);
+        else
+            $display("SLAVE TEST FAILED: slave_rx_data = %b", slave_rx_data);
+
+        #20;
+        $finish;
     end
 
-endmodule
+endmodule 
+      
