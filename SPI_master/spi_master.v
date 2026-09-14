@@ -1,170 +1,175 @@
-module spi_master (
-    input wire clk,
-    input wire rst,
-    // Chip Select
-    input wire en,
-    output reg cs,
-    // Serial Clock
-    output reg sck,
-    // Master Out Slave In
-    input wire [7:0] ext_command_in,
-    input wire [23:0] ext_address_in,
-    input wire [31:0] ext_data_in,
-    output reg mosi,
-    // Master In Slave Out
-    input wire miso,
-    output wire [31:0] ext_data_out
+
+`timescale 1ns/1ns
+
+module  spi_master (
+input [7:0]mosi_data ,
+input  wire miso, 
+input  wire clk ,
+input wire rst ,
+input wire start ,
+
+output  reg cs ,
+output reg sclk ,
+output reg mosi , 
+output reg busy, 
+output reg done ,
+output reg [7:0]miso_data  
 );
-    
-    // Serial Clock
+parameter IDLE = 2'b00,
+               CS_LOW= 2'b01,
+               TRANSFER= 2'b10,
+               CS_HIGH  = 2'b11;
 
-    reg clock_count;
+parameter CLK_DIV = 2;
+reg [1:0]ps ,ns ;
+reg [7:0]tx,rx;
+reg[3:0]bit_count;
+reg[3:0]clk_count;
+//-------------------------------------------------------------------------------------------------------------------------------
+always@(posedge clk or posedge rst)begin 
+if (rst)
+     ps <=  IDLE ;
+else 
+   ps <= ns ;
+end 
 
-    always @(posedge clk) begin
-        if (rst) begin
-            clock_count <= 0;
-        end
-        else begin
-            if ((current_state == ENABLE) || (current_state == DATA)) begin
-                clock_count <= clock_count + 1;
-            end
-            else begin
-                clock_count <= 0;
-            end
-        end
-    end
+//--------------------------clk divider(only active while shifting)------------------------------------------------------------
+always@(posedge clk or posedge rst)begin 
+if (rst) begin 
+                   clk_count  <= 0;
+                   sclk <= 0;
+end 
+else if (ps == TRANSFER)begin
+     clk_count <= clk_count +1'b1; 
+        
 
-    // Master Out Slave In
+            if(clk_count  == CLK_DIV - 1)begin 
+                   clk_count <= 0;
+                   sclk  <=  ~sclk;
+end 
 
-    reg [63:0] data_save;
-    reg [5:0] data_count;
-    reg data_end;
+end 
+else begin 
+               clk_count  <=  0;
+              sclk <= 1'b0;
+end 
+end // always begin -end 
 
-    always @(posedge clk) begin
-        if (rst) begin
-            data_save <= 0;
-            data_count <= 0;
-            data_end <= 0;
-        end
-        else begin
-            if (current_state == DATA) begin
-                if (sck == 1) begin
-                    // Command, address and data shifted serially on MOSI line from MSB respectively
-                    data_save <= {data_save[62:0],1'b0};
-                    if (data_count == 63) begin
-                        data_count <= 0;
-                        data_end <= 1;
-                    end
-                    else begin
-                        data_count <= data_count + 1;
-                        data_end <= 0;
-                    end
-                end
-                else begin
-                    data_save <= data_save;
-                    data_count <= data_count;
-                    data_end <= 0;
-                end
-            end
-            else begin
-                // Data being written on command ALL ZEROS
-                if (ext_command_in == 8'h00) begin
-                    data_save <= {ext_command_in,ext_address_in,ext_data_in};
-                    data_count <= 0;
-                    data_end <= 0;
-                end
-                else begin
-                    data_save <= {ext_command_in,ext_address_in,32'h0000_0000};
-                    data_count <= 0;
-                    data_end <= 0;
-                end
-            end
-        end
-    end
+//-------------TX shift register --------------------------------------------------------------
+always@(posedge clk or posedge rst )begin 
+  if(rst)begin
+             tx <= 8'd0;
+           bit_count <= 4'b0;
+end 
+  else if( ps ==  CS_LOW ) begin 
+              tx  <=  mosi_data;
+              bit_count  <=  0;
+end 
+else if (ps == TRANSFER &&  clk_count == CLK_DIV - 1  &&  sclk ==1'b1 && bit_count <8)begin
+              bit_count  <=   bit_count   + 1'b1;
+end 
+end 
 
-    // Master In Slave Out
+//--------------------RX shift register + bit counter ----------------------------------------------------
+always@(posedge clk or  posedge rst)begin 
+    if(rst)  begin
+             rx  <=  8'd0;
+end 
 
-    reg [31:0] data_in;
+else if  (ps == TRANSFER && clk_count == CLK_DIV - 1 &&  sclk == 0 &&  bit_count < 8) begin 
+            rx [7-bit_count] <= miso;
+          
+end 
+end
 
-    always @(posedge clk) begin
-        if (rst) begin
-            data_in <= 0;
-        end
-        else begin
-            if (current_state == DATA) begin
-                if (sck == 0) begin
-                    // Data being saved from MISO line from LSB
-                    if ((data_count >= 32) && (data_count <= 63)) begin
-                        data_in <= {data_in[30:0],miso};
-                    end
-                    else begin
-                        data_in <= data_in;
-                    end
-                end
-                else begin
-                    data_in <= data_in;
-                end
-            end
-            else begin
-                
-            end
-        end
-    end
+//------------output data--------------------------------------------------------------------------------------------------------------
+always@(posedge clk or posedge rst )begin 
+    if(rst) begin 
+              miso_data <=  8'd0;
+              done <= 1'b0;
+             busy   <= 1'b0;
+end 
 
-    assign ext_data_out = data_in;
-    
-    // Finite State Machine
+else if ( ps == CS_LOW  ||  ps == TRANSFER) begin 
+              done <=  1'b0;
+               busy <= 1'b1;
+end 
 
-    localparam IDLE = 2'b00;
-    localparam ENABLE = 2'b01;
-    localparam DATA = 2'b10;
+else if (ps  == CS_HIGH) begin 
+            miso_data  <= rx;
+           done <=  1'b1;
+          busy  <=  1'b0;
+end 
 
-    reg [1:0] current_state, next_state;
+else  begin
+            done <= 1'b0;
+end 
+end
 
-    always @(posedge clk) begin
-        if (rst) begin
-            current_state <= 0;
-        end
-        else begin
-            current_state <= next_state;
-        end
-    end
+//--------------------NEXT -STATE Logic------------------------------------------
+always@(*)begin 
+   case (ps)
+            IDLE : begin 
+            if(start)
+                      ns  =  CS_LOW;
+           else 
+                    ns =   IDLE;
+end 
 
-    always @(*) begin
-        if (rst) begin
-            next_state = 0;
-        end
-        else begin
-            case (current_state)
-                IDLE: begin
-                    cs = 1;
-                    sck = 1;
-                    mosi = 0;
-                    if (en == 1'b1) begin
-                        next_state = ENABLE;
-                    end
-                end
-                ENABLE: begin
-                    cs = 0;
-                    sck = ~clock_count;
-                    mosi = 0;
-                    next_state = DATA;
-                end
-                DATA: begin
-                    cs = 0;
-                    sck = ~clock_count;
-                    // Command, address and data shifted serially on MOSI line from MSB respectively
-                    mosi = data_save[63];
-                    if (data_end == 1'b1) begin
-                        sck = 1;
-                        next_state = IDLE;
-                    end
-                end
-                default: next_state = IDLE;
-            endcase
-        end
-    end
+             CS_LOW : begin 
+                   ns =   TRANSFER;
+              end 
 
-endmodule
+              TRANSFER : begin 
+            if(bit_count == 8)
+                   ns  =  CS_HIGH;
+           else 
+                   ns  =  TRANSFER;
+end 
+
+              CS_HIGH : begin 
+                       ns =  IDLE;
+end 
+               default :  begin 
+                        ns  = IDLE;
+end
+endcase 
+end 
+
+//-------------------------------------output logic with cs , mosi---------------------------
+
+always@(*)begin 
+   case (ps)  
+           IDLE : begin 
+              cs = 1'b1;
+               mosi = 1'b1;
+end 
+            CS_LOW : begin 
+                 cs = 1'b0;
+                 mosi = 1'b1;
+end 
+              TRANSFER : begin 
+                   cs = 1'b0;
+               if(bit_count <8)
+                      mosi = tx [7-bit_count];
+  else
+               mosi = 1;
+end
+             CS_HIGH : begin 
+                      cs = 1'b1;
+                      mosi = 1'b1;
+end 
+              default : begin 
+                    cs = 1'b1;
+                   mosi = 1'b1;
+end 
+endcase 
+end 
+endmodule         
+
+
+
+
+
 
 
