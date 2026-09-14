@@ -1,94 +1,56 @@
-module spi (
-    input wire clk,
-    input wire rst,
-    input wire [2:0] addr,
-    input wire we,
-    input wire [31:0] write_data,
-    input wire re,
-    output reg [31:0] read_data
+
+ `timescale 1ns/1ns
+
+module SPI_TOP (
+    input  wire       clk,
+    input  wire       rst,
+    input  wire       start,
+
+    input  wire [7:0] master_tx_data,
+    input  wire [7:0] slave_tx_data,
+
+    output wire [7:0] master_rx_data,
+    output wire [7:0] slave_rx_data,
+
+    output wire       sclk,
+    output wire       cs,
+    output wire       mosi,
+    output wire       miso,
+
+    output wire       master_busy,
+    output wire       master_done,
+    output wire       slave_done
 );
-    
-    // Register Interface
 
-    localparam ENABLE = 3'b000;
-    localparam COMMAND = 3'b001;
-    localparam ADDRESS = 3'b010;
-    localparam DATA_IN = 3'b011;
-    localparam DATA_OUT = 3'b100;
-    
-    reg enable;
-    reg [7:0] command;
-    reg [23:0] address;
-    reg [31:0] data_in;
-    wire [31:0] data_out;
+    // SPI Master
+    spi_master master_inst (
+        .mosi_data (master_tx_data),
+        .miso      (miso),
+        .clk       (clk),
+        .rst       (rst),
+        .start     (start),
 
-    always @(*) begin
-        if (rst) begin
-            enable = 0;
-            command = 0;
-            address = 0;
-            data_in = 0;
-        end
-        else begin
-            case (addr)
-                ENABLE: begin
-                    if (we == 1'b1) begin
-                        enable = write_data[0];
-                    end
-                end
-                COMMAND: begin
-                    if (we == 1'b1) begin
-                        command = write_data[7:0];
-                    end
-                end
-                ADDRESS: begin
-                    if (we == 1'b1) begin
-                        address = write_data[23:0];
-                    end
-                end
-                DATA_IN: begin
-                    if (we == 1'b1) begin
-                        data_in = write_data[31:0];
-                    end
-                end
-                DATA_OUT: begin
-                    if (re == 1'b1) begin
-                        read_data = data_out;
-                    end
-                end
-                // default: 
-            endcase
-        end
-    end
-
-    // Master Slave Interface
-
-    wire cs;
-    wire sck;
-    wire mosi;
-    wire miso;
-
-    spi_master uut_master (
-        .clk (clk),
-        .rst (rst),
-        .en (enable),
-        .cs (cs),
-        .sck (sck),
-        .ext_command_in (command),
-        .ext_address_in (address),
-        .ext_data_in (data_in),
-        .mosi (mosi),
-        .miso (miso),
-        .ext_data_out (data_out)
+        .cs        (cs),
+        .sclk      (sclk),
+        .mosi      (mosi),
+        .busy      (master_busy),
+        .done      (master_done),
+        .miso_data (master_rx_data)
     );
 
-    spi_slave uut_slave (
-        .clk (clk),
-        .rst (rst),
-        .cs (cs),
-        .sck (sck),
-        .mosi (mosi),
-        .miso (miso)
+    // SPI Slave
+    spi_slave_v2 slave_inst (
+        .clk     (clk),
+        .rst     (rst),
+        .cs      (cs),
+        .sclk    (sclk),
+        .mosi    (mosi),
+
+        .miso    (miso),
+
+        .tx_data (slave_tx_data),
+        .rx_data (slave_rx_data),
+        .done    (slave_done)
     );
 
 endmodule
