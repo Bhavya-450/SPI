@@ -43,6 +43,8 @@ Multiple CS/SS pins may be available on the master, which allows for multiple sl
 
 - ## MULTIPLE SELECT :
 
+![MULTIPLE SELECT](doc/img2.png)
+
 SPI can be set up to operate with a single master and a single slave, and it can be set up with multiple slaves controlled by a single master. 
 There are two ways to connect multiple slaves to the master. If the master has multiple slave select pins, the slaves can be wired in parallel like this:
 
