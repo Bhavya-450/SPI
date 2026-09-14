@@ -172,6 +172,11 @@ OUTPUT- SPI SLAVE:
 ![OUTPUT- SPI SLAVE](doc/img5.png)
 
 
+## FINAL OUTPUT:
+
+![FINAL OUTPUT](doc/img6.png)
+
+
 
 
 
