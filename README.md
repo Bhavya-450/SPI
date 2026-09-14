@@ -54,7 +54,7 @@ To begin communication, the SPI master first selects the device it wants to comm
 If a waiting period is required, such as for an analog-to-digital conversion, the master must wait for at least that period of time before issuing clock cycles.
 
 
-![DATA TRANSMISSION](doc/img3.png
+![DATA TRANSMISSION](doc/img3.png)
 
 During each SPI clock cycle, full-duplex transmission of a single bit occurs. The master sends a bit on the MOSI line while the slave sends a bit on the MISO line, and then each reads their corresponding incoming bit. This sequence is maintained even when only one-directional data transfer is intended.
 
@@ -73,8 +73,8 @@ Transmission may continue for any number of clock cycles. When complete, the mas
 - SCLKCPOL=0 is a clock which idles at the logical low voltage.
   
 - SCLKCPOL=1 is a clock which idles at the logical high voltage.
-  
-CPHA represents the phase of each data bit's transmission cycle relative to SCLK.
+    
+- CPHA represents the phase of each data bit's transmission cycle relative to SCLK.
 
 - **For CPHA=0:**
   
